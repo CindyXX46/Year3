@@ -1,0 +1,69 @@
+---
+title: "cw"
+author: "Xin"
+date: "2022-12-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#libraries
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+library(faux)
+library(psych)
+```
+
+```{r}
+PID_no <- 280  # There are 280 participants
+prop_dyslex <- 47/280  # 47 of 280 participants have dyslexia
+#nquestion <- 6
+
+#fix effect
+b0 <- 1.5  #intercept
+b1 <- -1.81  #dyslexia coefficient
+b2 <- -0.59  #mode coefficient (listening)
+b3 <- -0.11  #mode coefficient (reading-out-loud assistance)
+
+#random effect
+tau_0 <- 1.85  #participants intercept SD
+#omega_0 <- 0.59  #question intercept SD
+  
+Pdata <- tibble(PID = 1:PID_no, #participants numbers
+                u0p = rnorm(n = PID_no, 
+                            mean = 0, 
+                            sd = tau_0),  #random intercepts
+                dyslexia = rbinom(n = PID_no, 
+                                  size = 1, 
+                                  prob = prop_dyslex))  #dyslexia
+
+simdata <- crossing(PID = 1:PID_no, 
+                    mode = c("1reading", "listening", "RAS"))  # Adding number 1 in front of the reading because we want to make it the reference level
+
+simdata <- simdata %>% inner_join(Pdata, by='PID')
+
+simdata <- simdata %>% mutate(b0 = b0,
+                              b1 = b1,
+                              mode_effect = if_else(mode == "listening", b2, if_else(mode == "RAS", b3, 0)),
+                              accuracy_logodds = b0 + u0p + b1*dyslexia + mode_effect)
+
+simdata <- simdata %>%
+  mutate(probability = logistic(accuracy_logodds)) %>%
+  mutate(accuracy = rbinom(n = nrow(simdata),
+                        size = 1,
+                        prob = probability))
+```
+
+```{r}
+mod1 <- glmer(accuracy ~ dyslexia + mode + (1|PID), dat = simdata, family = "binomial")
+summary(mod1)
+```
+
+```{r}
+
+```
+
